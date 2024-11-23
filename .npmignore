@@ -1,0 +1,8 @@
+/node_modules
+/src
+/cache_cursor
+
+.env
+.DS_Store
+tsconfig.json
+tsup.config.ts

@@ -1,0 +1,5 @@
+/node_modules
+/cache_cursor
+
+.env
+.DS_Store
