@@ -1,7 +1,7 @@
 {
   "name": "@minhchi1509/instagram-downloader",
   "description": "Download all posts, reels, highlights, stoties of an Instagram account",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "main": "./dist/main.js",
   "module": "./dist/main.mjs",
   "types": "./dist/main.d.ts",
