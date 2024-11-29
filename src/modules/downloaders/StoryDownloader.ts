@@ -6,23 +6,19 @@ import PathUtils from "src/modules/utils/PathUtils";
 
 class StoryDownloader {
   private instagramRequest: InstagramRequest;
-  private username: string;
 
-  constructor(instagramRequest: InstagramRequest, username: string) {
+  constructor(instagramRequest: InstagramRequest) {
     this.instagramRequest = instagramRequest;
-    this.username = username;
   }
 
-  downloadAllUserStories = async () => {
-    console.log(`🚀 Start downloading stories of ${this.username}`);
-    const stories = await this.instagramRequest.getUserStories(this.username);
+  downloadAllUserStories = async (username: string) => {
+    console.log(`🚀 Start downloading stories of ${username}`);
+    const stories = await this.instagramRequest.getUserStories(username);
     if (!stories.length) {
-      console.log(`👀 No stories found for ${this.username}`);
+      console.log(`👀 No stories found for ${username}`);
       return;
     }
-    const { STORY_SAVED_DIR } = PathUtils.getSavedUserMediaDirPath(
-      this.username
-    );
+    const { STORY_SAVED_DIR } = PathUtils.getSavedUserMediaDirPath(username);
     await DownloadUtils.downloadByBatch(
       stories,
       async (story: IStory) => {
@@ -35,7 +31,7 @@ class StoryDownloader {
       true
     );
     console.log(
-      `✅ Downloaded all stories of ${this.username} successfully and saved to ${STORY_SAVED_DIR}`
+      `✅ Downloaded all stories of ${username} successfully and saved to ${STORY_SAVED_DIR}`
     );
   };
 }

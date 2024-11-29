@@ -138,6 +138,16 @@ var import_fs3 = require("fs");
 var import_path3 = __toESM(require("path"));
 var PathUtils = class {
 };
+PathUtils.getLocalDownloadDir = () => {
+  const LOCAL_DOWNLOAD_DIR = import_path3.default.resolve(
+    process.env.USERPROFILE || "",
+    "Downloads"
+  );
+  if (!(0, import_fs3.existsSync)(LOCAL_DOWNLOAD_DIR)) {
+    throw new Error("\u274C Cannot find the download directory on your system");
+  }
+  return LOCAL_DOWNLOAD_DIR;
+};
 PathUtils.getSavedUserMediaDirPath = (username) => {
   const LOCAL_DOWNLOAD_DIR = import_path3.default.resolve(
     process.env.USERPROFILE || "",
@@ -162,14 +172,12 @@ var PathUtils_default = PathUtils;
 
 // src/modules/downloaders/HighlightDownloader.ts
 var HighlightDownloader = class {
-  constructor(instagramRequest, username) {
-    this.getHighlightStoryStatistics = async () => {
+  constructor(instagramRequest) {
+    this.getHighlightStoryStatistics = async (username) => {
       console.log(
-        `\u{1F680} Start getting highlight stories data of user ${this.username}...`
+        `\u{1F680} Start getting highlight stories data of user ${username}...`
       );
-      const highlightStories = await this.instagramRequest.getAllHighlightsIdAndTitleOfUser(
-        this.username
-      );
+      const highlightStories = await this.instagramRequest.getAllHighlightsIdAndTitleOfUser(username);
       const highlightStoriesWithStatistics = await Promise.all(
         highlightStories.map(async (highlightStory) => {
           const stories = await this.instagramRequest.getAllSubStoriesByHighlightId(
@@ -192,15 +200,13 @@ var HighlightDownloader = class {
         })
       );
       console.log(
-        `\u2705 Get total ${highlightStoriesWithStatistics.length} highlight stories data of user ${this.username} successfully!`
+        `\u2705 Get total ${highlightStoriesWithStatistics.length} highlight stories data of user ${username} successfully!`
       );
       return highlightStoriesWithStatistics;
     };
-    this.downloadHighlightStoryMedia = async (highlightStoriesData) => {
+    this.downloadHighlightStoryMedia = async (username, highlightStoriesData) => {
       console.log(`\u{1F680} Start downloading highlight stories media...`);
-      const baseDir = PathUtils_default.getSavedUserMediaDirPath(
-        this.username
-      ).HIGHLIGHT_SAVED_DIR;
+      const baseDir = PathUtils_default.getSavedUserMediaDirPath(username).HIGHLIGHT_SAVED_DIR;
       await DownloadUtils_default.downloadByBatch(
         highlightStoriesData,
         async (highlightStory) => {
@@ -226,7 +232,7 @@ var HighlightDownloader = class {
         `\u2705 Download all highlight stories media successfully and saved to ${baseDir}`
       );
     };
-    this.writeHighlightStoryStatisticToFile = (highlightStoriesData) => {
+    this.writeHighlightStoryStatisticToFile = (username, highlightStoriesData) => {
       const fileContent = {
         total_highlight_stories: highlightStoriesData.length,
         highlight_stories: highlightStoriesData.map((highlightStory) => ({
@@ -242,30 +248,58 @@ var HighlightDownloader = class {
           }))
         }))
       };
-      const baseDir = PathUtils_default.getSavedUserMediaDirPath(
-        this.username
-      ).HIGHLIGHT_SAVED_DIR;
+      const baseDir = PathUtils_default.getSavedUserMediaDirPath(username).HIGHLIGHT_SAVED_DIR;
       const fileName = "highlight_stories.json";
       FileUtils_default.writeToFile(
         import_path4.default.resolve(baseDir, fileName),
         JSON.stringify(fileContent, null, 2)
       );
     };
-    this.downloadAllUserHighlightStories = async (writeStatisticFile = true, downloadMedia = true) => {
-      const highlightStoriesData = await this.getHighlightStoryStatistics();
+    this.downloadAllUserHighlightStories = async (username, writeStatisticFile = true, downloadMedia = true) => {
+      const highlightStoriesData = await this.getHighlightStoryStatistics(
+        username
+      );
       if (!highlightStoriesData.length) {
-        console.log(`\u{1F440} No highlights found for ${this.username}`);
+        console.log(`\u{1F440} No highlights found for ${username}`);
         return;
       }
       if (writeStatisticFile) {
-        this.writeHighlightStoryStatisticToFile(highlightStoriesData);
+        this.writeHighlightStoryStatisticToFile(username, highlightStoriesData);
       }
       if (downloadMedia) {
-        await this.downloadHighlightStoryMedia(highlightStoriesData);
+        await this.downloadHighlightStoryMedia(username, highlightStoriesData);
       }
     };
+    this.downloadHighlightStoryById = async (highlightId) => {
+      const highlightStoriesData = await this.instagramRequest.getAllSubStoriesByHighlightId(highlightId);
+      if (!highlightStoriesData.length) {
+        console.log(`\u{1F440} No stories found for highlight ${highlightId}`);
+        return;
+      }
+      console.log(
+        `\u{1F680} Start downloading stories media of highlight ${highlightId}...`
+      );
+      const saveDir = import_path4.default.join(
+        PathUtils_default.getLocalDownloadDir(),
+        `highlight_${highlightId}`
+      );
+      await DownloadUtils_default.downloadByBatch(
+        highlightStoriesData,
+        async (story) => {
+          const extension = story.isVideo ? "mp4" : "jpg";
+          const fileName = `${story.id}.${extension}`;
+          await DownloadUtils_default.downloadMedia(
+            story.downloadUrl,
+            import_path4.default.resolve(saveDir, fileName)
+          );
+        },
+        true
+      );
+      console.log(
+        `\u2705 Download all stories media of highlight ${highlightId} successfully and saved to ${saveDir}`
+      );
+    };
     this.instagramRequest = instagramRequest;
-    this.username = username;
   }
 };
 var HighlightDownloader_default = HighlightDownloader;
@@ -317,11 +351,9 @@ var CacheCursor_default = CacheCursor;
 
 // src/modules/downloaders/PostDownloader.ts
 var PostDownloader = class {
-  constructor(instagramRequest, username) {
-    this.writePostStatisticToCsv = async (data, totalFetchedPosts) => {
-      const { POSTS_SAVED_DIR } = PathUtils_default.getSavedUserMediaDirPath(
-        this.username
-      );
+  constructor(instagramRequest) {
+    this.writePostStatisticToCsv = async (username, data, totalFetchedPosts) => {
+      const { POSTS_SAVED_DIR } = PathUtils_default.getSavedUserMediaDirPath(username);
       const formattedData = data.map((item, index) => ({
         ordinal_number: index + totalFetchedPosts + 1,
         post_url: `https://instagram.com/p/${item.code}`,
@@ -338,11 +370,9 @@ var PostDownloader = class {
         formattedData
       );
     };
-    this.downloadUserPostsMedia = async (postsData, totalFetchedPosts) => {
+    this.downloadUserPostsMedia = async (username, postsData, totalFetchedPosts) => {
       console.log(`\u{1F680} Start downloading posts media...`);
-      const { POSTS_SAVED_DIR } = PathUtils_default.getSavedUserMediaDirPath(
-        this.username
-      );
+      const { POSTS_SAVED_DIR } = PathUtils_default.getSavedUserMediaDirPath(username);
       await DownloadUtils_default.downloadByBatch(
         postsData,
         async (post, index) => {
@@ -375,32 +405,53 @@ var PostDownloader = class {
         `\u2705 Download posts media successfully and saved to ${POSTS_SAVED_DIR}`
       );
     };
-    this.downloadAllUserPosts = async (writeStatisticFile = true, downloadMedia = true, limit = Infinity) => {
+    this.downloadAllUserPosts = async (username, writeStatisticFile = true, downloadMedia = true, limit = Infinity) => {
       if (limit !== Infinity && limit % 12 !== 0) {
         throw new Error("\u274C Limit must be a multiple of 12");
       }
-      const cursor = CacheCursor_default.getCacheCursor(this.username, "POSTS");
+      const cursor = CacheCursor_default.getCacheCursor(username, "POSTS");
       const startCursor = cursor?.nextCursor || "";
       const totalFetchedPosts = cursor?.totalFetchedItems || 0;
       const postsData = await this.instagramRequest.getUserPosts(
-        this.username,
+        username,
         startCursor,
         totalFetchedPosts,
         limit
       );
       if (!postsData.length) {
-        console.log(`\u{1F440} No posts found for ${this.username}`);
+        console.log(`\u{1F440} No posts found for ${username}`);
         return;
       }
       if (writeStatisticFile) {
-        this.writePostStatisticToCsv(postsData, totalFetchedPosts);
+        this.writePostStatisticToCsv(username, postsData, totalFetchedPosts);
       }
       if (downloadMedia) {
-        await this.downloadUserPostsMedia(postsData, totalFetchedPosts);
+        await this.downloadUserPostsMedia(username, postsData, totalFetchedPosts);
       }
     };
+    this.downloadPostByCode = async (postCode) => {
+      const postData = await this.instagramRequest.getPostDataByCode(postCode);
+      console.log(`\u{1F680} Start downloading all media of post ${postCode}...`);
+      const saveDir = import_path6.default.resolve(
+        PathUtils_default.getLocalDownloadDir(),
+        `post_${postCode}`
+      );
+      const downloadVideos = postData.videos.map(async (video) => {
+        await DownloadUtils_default.downloadMedia(
+          video.downloadUrl,
+          import_path6.default.resolve(saveDir, `${video.id}.mp4`)
+        );
+      });
+      const downloadImages = postData.images.map(async (image) => {
+        await DownloadUtils_default.downloadMedia(
+          image.downloadUrl,
+          import_path6.default.resolve(saveDir, `${image.id}.jpg`)
+        );
+      });
+      await Promise.all([...downloadVideos, ...downloadImages]);
+      console.log(`\u2705 Download successfully and saved to ${saveDir}`);
+    };
     this.instagramRequest = instagramRequest;
-    this.username = username;
   }
 };
 var PostDownloader_default = PostDownloader;
@@ -408,11 +459,9 @@ var PostDownloader_default = PostDownloader;
 // src/modules/downloaders/ReelDownloader.ts
 var import_path7 = __toESM(require("path"));
 var ReelsDownloader = class {
-  constructor(instagramRequest, username) {
-    this.writeReelsStatisticToCsv = async (data, totalFetchedReels) => {
-      const { REELS_SAVED_DIR } = PathUtils_default.getSavedUserMediaDirPath(
-        this.username
-      );
+  constructor(instagramRequest) {
+    this.writeReelsStatisticToCsv = async (username, data, totalFetchedReels) => {
+      const { REELS_SAVED_DIR } = PathUtils_default.getSavedUserMediaDirPath(username);
       const formattedData = data.map((item, index) => ({
         ordinal_number: index + totalFetchedReels + 1,
         reel_url: `https://instagram.com/reel/${item.code}`,
@@ -427,11 +476,9 @@ var ReelsDownloader = class {
         formattedData
       );
     };
-    this.downloadReelsMedia = async (reels, totalFetchedReels) => {
+    this.downloadReelsMedia = async (username, reels, totalFetchedReels) => {
       console.log(`\u{1F680} Start downloading reels...`);
-      const { REELS_SAVED_DIR } = PathUtils_default.getSavedUserMediaDirPath(
-        this.username
-      );
+      const { REELS_SAVED_DIR } = PathUtils_default.getSavedUserMediaDirPath(username);
       await DownloadUtils_default.downloadByBatch(
         reels,
         async (reel, index) => {
@@ -446,32 +493,47 @@ var ReelsDownloader = class {
         `\u2705 Downloaded reels successfully and saved to ${REELS_SAVED_DIR}!`
       );
     };
-    this.downloadAllUserReels = async (writeStatisticFile = true, downloadMedia = false, limit = Infinity) => {
+    this.downloadAllUserReels = async (username, writeStatisticFile = true, downloadMedia = false, limit = Infinity) => {
       if (limit !== Infinity && limit % 12 !== 0) {
         throw new Error("\u274C Limit must be a multiple of 12");
       }
-      const cursor = CacheCursor_default.getCacheCursor(this.username, "REELS");
+      const cursor = CacheCursor_default.getCacheCursor(username, "REELS");
       const startCursor = cursor?.nextCursor || "";
       const totalFetchedReels = cursor?.totalFetchedItems || 0;
       const reelsData = await this.instagramRequest.getUserReels(
-        this.username,
+        username,
         startCursor,
         totalFetchedReels,
         limit
       );
       if (!reelsData.length) {
-        console.log(`\u{1F440} No reels found for ${this.username}`);
+        console.log(`\u{1F440} No reels found for ${username}`);
         return;
       }
       if (writeStatisticFile) {
-        await this.writeReelsStatisticToCsv(reelsData, totalFetchedReels);
+        await this.writeReelsStatisticToCsv(
+          username,
+          reelsData,
+          totalFetchedReels
+        );
       }
       if (downloadMedia) {
-        await this.downloadReelsMedia(reelsData, totalFetchedReels);
+        await this.downloadReelsMedia(username, reelsData, totalFetchedReels);
       }
     };
+    this.downloadReelByCode = async (reelCode) => {
+      console.log(`\u{1F680} Start downloading reel with code ${reelCode}...`);
+      const reelData = await this.instagramRequest.getReelDataByCode(reelCode);
+      const downloadDir = PathUtils_default.getLocalDownloadDir();
+      await DownloadUtils_default.downloadMedia(
+        reelData.downloadUrl,
+        import_path7.default.resolve(downloadDir, `${reelCode}.mp4`)
+      );
+      console.log(
+        `\u2705 Downloaded reel with code ${reelCode} successfully and saved to ${downloadDir}!`
+      );
+    };
     this.instagramRequest = instagramRequest;
-    this.username = username;
   }
 };
 var ReelDownloader_default = ReelsDownloader;
@@ -479,17 +541,15 @@ var ReelDownloader_default = ReelsDownloader;
 // src/modules/downloaders/StoryDownloader.ts
 var import_path8 = __toESM(require("path"));
 var StoryDownloader = class {
-  constructor(instagramRequest, username) {
-    this.downloadAllUserStories = async () => {
-      console.log(`\u{1F680} Start downloading stories of ${this.username}`);
-      const stories = await this.instagramRequest.getUserStories(this.username);
+  constructor(instagramRequest) {
+    this.downloadAllUserStories = async (username) => {
+      console.log(`\u{1F680} Start downloading stories of ${username}`);
+      const stories = await this.instagramRequest.getUserStories(username);
       if (!stories.length) {
-        console.log(`\u{1F440} No stories found for ${this.username}`);
+        console.log(`\u{1F440} No stories found for ${username}`);
         return;
       }
-      const { STORY_SAVED_DIR } = PathUtils_default.getSavedUserMediaDirPath(
-        this.username
-      );
+      const { STORY_SAVED_DIR } = PathUtils_default.getSavedUserMediaDirPath(username);
       await DownloadUtils_default.downloadByBatch(
         stories,
         async (story) => {
@@ -502,11 +562,10 @@ var StoryDownloader = class {
         true
       );
       console.log(
-        `\u2705 Downloaded all stories of ${this.username} successfully and saved to ${STORY_SAVED_DIR}`
+        `\u2705 Downloaded all stories of ${username} successfully and saved to ${STORY_SAVED_DIR}`
       );
     };
     this.instagramRequest = instagramRequest;
-    this.username = username;
   }
 };
 var StoryDownloader_default = StoryDownloader;
@@ -754,6 +813,36 @@ var InstagramRequest = class {
       );
       return userPosts;
     };
+    this.getPostDataByCode = async (postCode) => {
+      const { data } = await this.axiosInstance.get(
+        `https://www.instagram.com/p/${postCode}/?__a=1&__d=dis`
+      );
+      const postData = data.items[0];
+      const originalMediaList = Array.from(
+        postData.carousel_media || [postData]
+      );
+      const videos = originalMediaList.filter((media) => media.media_type === 2).map((media) => ({
+        downloadUrl: media.video_versions[0].url,
+        id: media.id
+      }));
+      const images = originalMediaList.filter((media) => media.media_type === 1).map((media) => ({
+        downloadUrl: media.image_versions2.candidates[0].url,
+        id: media.id
+      }));
+      return {
+        id: postData.id,
+        code: postData.code,
+        title: postData.caption?.text,
+        takenAt: import_dayjs2.default.unix(postData.taken_at).format("DD/MM/YYYY HH:mm:ss"),
+        totalMedia: originalMediaList.length,
+        videoCount: videos.length,
+        imageCount: images.length,
+        likeCount: postData.like_and_view_counts_disabled ? null : postData.like_count,
+        commentCount: postData.comment_count,
+        videos,
+        images
+      };
+    };
     this.clearProfilePostById = async (postId, csrfToken) => {
       await this.axiosInstance.post(
         `https://www.instagram.com/api/v1/web/create/${postId}/delete/?__s=p7ydkq:utmpms:ew6qri`,
@@ -791,22 +880,18 @@ var InstagramRequest_default = InstagramRequest;
 
 // src/modules/InstagramDownloader.ts
 var InstagramDownloader = class {
-  constructor(cookies, username) {
-    this.getProfileInfor = async () => {
+  constructor(cookies) {
+    this.getProfileInfor = async (username) => {
       const profileInfor = await this.instagramRequest.getProfileStatistics(
-        this.username
+        username
       );
       return profileInfor;
     };
     this.instagramRequest = new InstagramRequest_default(cookies);
-    this.username = username;
-    this.highlight = new HighlightDownloader_default(
-      this.instagramRequest,
-      this.username
-    );
-    this.post = new PostDownloader_default(this.instagramRequest, this.username);
-    this.reel = new ReelDownloader_default(this.instagramRequest, this.username);
-    this.story = new StoryDownloader_default(this.instagramRequest, this.username);
+    this.highlight = new HighlightDownloader_default(this.instagramRequest);
+    this.post = new PostDownloader_default(this.instagramRequest);
+    this.reel = new ReelDownloader_default(this.instagramRequest);
+    this.story = new StoryDownloader_default(this.instagramRequest);
   }
 };
 var InstagramDownloader_default = InstagramDownloader;

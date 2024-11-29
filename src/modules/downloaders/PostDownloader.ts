@@ -8,20 +8,17 @@ import PathUtils from "src/modules/utils/PathUtils";
 
 class PostDownloader {
   private instagramRequest: InstagramRequest;
-  private username: string;
 
-  constructor(instagramRequest: InstagramRequest, username: string) {
+  constructor(instagramRequest: InstagramRequest) {
     this.instagramRequest = instagramRequest;
-    this.username = username;
   }
 
   private writePostStatisticToCsv = async (
+    username: string,
     data: IPost[],
     totalFetchedPosts: number
   ) => {
-    const { POSTS_SAVED_DIR } = PathUtils.getSavedUserMediaDirPath(
-      this.username
-    );
+    const { POSTS_SAVED_DIR } = PathUtils.getSavedUserMediaDirPath(username);
     const formattedData = data.map((item, index) => ({
       ordinal_number: index + totalFetchedPosts + 1,
       post_url: `https://instagram.com/p/${item.code}`,
@@ -40,13 +37,12 @@ class PostDownloader {
   };
 
   private downloadUserPostsMedia = async (
+    username: string,
     postsData: IPost[],
     totalFetchedPosts: number
   ) => {
     console.log(`🚀 Start downloading posts media...`);
-    const { POSTS_SAVED_DIR } = PathUtils.getSavedUserMediaDirPath(
-      this.username
-    );
+    const { POSTS_SAVED_DIR } = PathUtils.getSavedUserMediaDirPath(username);
     await DownloadUtils.downloadByBatch(
       postsData,
       async (post: IPost, index: number) => {
@@ -82,6 +78,7 @@ class PostDownloader {
   };
 
   downloadAllUserPosts = async (
+    username: string,
     writeStatisticFile: boolean = true,
     downloadMedia: boolean = true,
     limit: number = Infinity
@@ -89,25 +86,48 @@ class PostDownloader {
     if (limit !== Infinity && limit % 12 !== 0) {
       throw new Error("❌ Limit must be a multiple of 12");
     }
-    const cursor = CacheCursor.getCacheCursor(this.username, "POSTS");
+    const cursor = CacheCursor.getCacheCursor(username, "POSTS");
     const startCursor = cursor?.nextCursor || "";
     const totalFetchedPosts = cursor?.totalFetchedItems || 0;
     const postsData = await this.instagramRequest.getUserPosts(
-      this.username,
+      username,
       startCursor,
       totalFetchedPosts,
       limit
     );
     if (!postsData.length) {
-      console.log(`👀 No posts found for ${this.username}`);
+      console.log(`👀 No posts found for ${username}`);
       return;
     }
     if (writeStatisticFile) {
-      this.writePostStatisticToCsv(postsData, totalFetchedPosts);
+      this.writePostStatisticToCsv(username, postsData, totalFetchedPosts);
     }
     if (downloadMedia) {
-      await this.downloadUserPostsMedia(postsData, totalFetchedPosts);
+      await this.downloadUserPostsMedia(username, postsData, totalFetchedPosts);
     }
+  };
+
+  downloadPostByCode = async (postCode: string) => {
+    const postData = await this.instagramRequest.getPostDataByCode(postCode);
+    console.log(`🚀 Start downloading all media of post ${postCode}...`);
+    const saveDir = path.resolve(
+      PathUtils.getLocalDownloadDir(),
+      `post_${postCode}`
+    );
+    const downloadVideos = postData.videos.map(async (video) => {
+      await DownloadUtils.downloadMedia(
+        video.downloadUrl,
+        path.resolve(saveDir, `${video.id}.mp4`)
+      );
+    });
+    const downloadImages = postData.images.map(async (image) => {
+      await DownloadUtils.downloadMedia(
+        image.downloadUrl,
+        path.resolve(saveDir, `${image.id}.jpg`)
+      );
+    });
+    await Promise.all([...downloadVideos, ...downloadImages]);
+    console.log(`✅ Download successfully and saved to ${saveDir}`);
   };
 }
 

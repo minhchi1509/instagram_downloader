@@ -8,20 +8,17 @@ import PathUtils from "src/modules/utils/PathUtils";
 
 class ReelsDownloader {
   private instagramRequest: InstagramRequest;
-  private username: string;
 
-  constructor(instagramRequest: InstagramRequest, username: string) {
+  constructor(instagramRequest: InstagramRequest) {
     this.instagramRequest = instagramRequest;
-    this.username = username;
   }
 
   private writeReelsStatisticToCsv = async (
+    username: string,
     data: IReel[],
     totalFetchedReels: number
   ) => {
-    const { REELS_SAVED_DIR } = PathUtils.getSavedUserMediaDirPath(
-      this.username
-    );
+    const { REELS_SAVED_DIR } = PathUtils.getSavedUserMediaDirPath(username);
     const formattedData = data.map((item, index) => ({
       ordinal_number: index + totalFetchedReels + 1,
       reel_url: `https://instagram.com/reel/${item.code}`,
@@ -38,13 +35,12 @@ class ReelsDownloader {
   };
 
   private downloadReelsMedia = async (
+    username: string,
     reels: IReel[],
     totalFetchedReels: number
   ) => {
     console.log(`🚀 Start downloading reels...`);
-    const { REELS_SAVED_DIR } = PathUtils.getSavedUserMediaDirPath(
-      this.username
-    );
+    const { REELS_SAVED_DIR } = PathUtils.getSavedUserMediaDirPath(username);
     await DownloadUtils.downloadByBatch(
       reels,
       async (reel: IReel, index: number) => {
@@ -61,6 +57,7 @@ class ReelsDownloader {
   };
 
   downloadAllUserReels = async (
+    username: string,
     writeStatisticFile: boolean = true,
     downloadMedia: boolean = false,
     limit: number = Infinity
@@ -68,25 +65,42 @@ class ReelsDownloader {
     if (limit !== Infinity && limit % 12 !== 0) {
       throw new Error("❌ Limit must be a multiple of 12");
     }
-    const cursor = CacheCursor.getCacheCursor(this.username, "REELS");
+    const cursor = CacheCursor.getCacheCursor(username, "REELS");
     const startCursor = cursor?.nextCursor || "";
     const totalFetchedReels = cursor?.totalFetchedItems || 0;
     const reelsData = await this.instagramRequest.getUserReels(
-      this.username,
+      username,
       startCursor,
       totalFetchedReels,
       limit
     );
     if (!reelsData.length) {
-      console.log(`👀 No reels found for ${this.username}`);
+      console.log(`👀 No reels found for ${username}`);
       return;
     }
     if (writeStatisticFile) {
-      await this.writeReelsStatisticToCsv(reelsData, totalFetchedReels);
+      await this.writeReelsStatisticToCsv(
+        username,
+        reelsData,
+        totalFetchedReels
+      );
     }
     if (downloadMedia) {
-      await this.downloadReelsMedia(reelsData, totalFetchedReels);
+      await this.downloadReelsMedia(username, reelsData, totalFetchedReels);
     }
+  };
+
+  downloadReelByCode = async (reelCode: string) => {
+    console.log(`🚀 Start downloading reel with code ${reelCode}...`);
+    const reelData = await this.instagramRequest.getReelDataByCode(reelCode);
+    const downloadDir = PathUtils.getLocalDownloadDir();
+    await DownloadUtils.downloadMedia(
+      reelData.downloadUrl,
+      path.resolve(downloadDir, `${reelCode}.mp4`)
+    );
+    console.log(
+      `✅ Downloaded reel with code ${reelCode} successfully and saved to ${downloadDir}!`
+    );
   };
 }
 

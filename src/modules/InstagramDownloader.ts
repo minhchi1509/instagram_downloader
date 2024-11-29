@@ -6,27 +6,22 @@ import InstagramRequest from "src/modules/InstagramRequest";
 
 class InstagramDownloader {
   private instagramRequest: InstagramRequest;
-  private username: string;
   public highlight: HighlightDownloader;
   public post: PostDownloader;
   public reel: ReelDownloader;
   public story: StoryDownloader;
 
-  constructor(cookies: string, username: string) {
+  constructor(cookies: string) {
     this.instagramRequest = new InstagramRequest(cookies);
-    this.username = username;
-    this.highlight = new HighlightDownloader(
-      this.instagramRequest,
-      this.username
-    );
-    this.post = new PostDownloader(this.instagramRequest, this.username);
-    this.reel = new ReelDownloader(this.instagramRequest, this.username);
-    this.story = new StoryDownloader(this.instagramRequest, this.username);
+    this.highlight = new HighlightDownloader(this.instagramRequest);
+    this.post = new PostDownloader(this.instagramRequest);
+    this.reel = new ReelDownloader(this.instagramRequest);
+    this.story = new StoryDownloader(this.instagramRequest);
   }
 
-  getProfileInfor = async () => {
+  getProfileInfor = async (username: string) => {
     const profileInfor = await this.instagramRequest.getProfileStatistics(
-      this.username
+      username
     );
     return profileInfor;
   };

@@ -2,6 +2,17 @@ import { existsSync } from "fs";
 import path from "path";
 
 class PathUtils {
+  static getLocalDownloadDir = () => {
+    const LOCAL_DOWNLOAD_DIR = path.resolve(
+      process.env.USERPROFILE || "",
+      "Downloads"
+    );
+    if (!existsSync(LOCAL_DOWNLOAD_DIR)) {
+      throw new Error("❌ Cannot find the download directory on your system");
+    }
+    return LOCAL_DOWNLOAD_DIR;
+  };
+
   static getSavedUserMediaDirPath = (username: string) => {
     const LOCAL_DOWNLOAD_DIR = path.resolve(
       process.env.USERPROFILE || "",

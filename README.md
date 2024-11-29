@@ -10,6 +10,7 @@
 - Download all user reels
 - Download all user highlight stories
 - Download all active stories of user
+- Download reel, highlight, post medias by its CODE
 - Delete All Instagram Posts on Your Account
 
 > [!WARNING]
@@ -39,20 +40,28 @@ const cookies = "YOUR_INSTAGRAM_COOKIES";
 // Username of the Instagram account you want to download
 const username = "minhchi1509";
 
-const instagramDownloader = new InstagramDownloader(cookies, username);
+const instagramDownloader = new InstagramDownloader(cookies);
 const profileCleaner = new ProfileCleaner(cookies);
 
 // Download all posts of the user
-instagramDownloader.post.downloadAllUserPosts();
+instagramDownloader.post.downloadAllUserPosts(username);
 
 // Download all reels of the user
-instagramDownloader.reel.downloadAllUserReels();
+instagramDownloader.reel.downloadAllUserReels(username);
 
 // Download all highlights of the user
-instagramDownloader.highlight.downloadAllUserHighlightStories();
+instagramDownloader.highlight.downloadAllUserHighlightStories(username);
 
 // Download active stories of the user
-instagramDownloader.story.downloadAllUserStories();
+instagramDownloader.story.downloadAllUserStories(username);
+
+// Download reel, post, highlight medias by its code
+const postCode = "DC6XbjFpCF8"; // From url: https://www.instagram.com/p/DC6XbjFpCF8/
+const reelCode = "DBONFumvXTH"; // From url: https://www.instagram.com/reel/DBONFumvXTH/
+const highlightId = "18040128229968128"; // From url: https://www.instagram.com/stories/highlights/18040128229968128/
+instagramDownloader.post.downloadPostByCode(postCode);
+instagramDownloader.reel.downloadReelByCode(reelCode);
+instagramDownloader.highlight.downloadHighlightStoryById(highlightId);
 
 // Delete all posts of your account
 profileCleaner.clearAllPosts();
@@ -64,24 +73,27 @@ profileCleaner.clearAllPosts();
 
 ```js
 instagramDownloader.post.downloadAllUserPosts(
+  username,
   writeStatisticFile,
   downloadMedia,
   limit
 );
 instagramDownloader.reel.downloadAllUserReels(
+  username,
   writeStatisticFile,
   downloadMedia,
   limit
 );
 instagramDownloader.highlight.downloadAllUserHighlightStories(
+  username,
   writeStatisticFile,
   downloadMedia
 );
-instagramDownloader.story.downloadAllUserStories();
+instagramDownloader.story.downloadAllUserStories(username);
 ```
 
 **Parameters**:
-
+- **username** _(string, required)_: The username of instagram user that you want to download their media
 - **writeStatisticFile** _(boolean, optional)_: If `true`, it will output a CSV file containing information about the posts. Default value: `true`
 - **downloadMedia** _(boolean, optional)_: If `true`, it will download videos, photos about the posts. Default value: `true`
 - **limit** _(number, optional)_: The limit number of posts/reels you want to download in one execution and it **MUST** be a multiple of 12. Suitable when a user has too many posts/reels and you only want to download (example: 120 posts/reels) at a time per execution. Default value: `Infinity`
@@ -89,6 +101,14 @@ instagramDownloader.story.downloadAllUserStories();
 > [!WARNING]
 > Note that when you specify the value of `limit` parameter, after the batch download is complete, there will be a folder named **cache_cursor/[username]** and it contains files like **posts.json**, **reels.json** to save information for the next posts/reels download. Please **DO NOT** edit anything in these files.
 > If you want to download posts or reels again from the beginning, delete the corresponding files.
+
+### Download post, reel, highlight by its ID/CODE
+
+```js
+instagramDownloader.post.downloadPostByCode(postCode: string);
+instagramDownloader.reel.downloadReelByCode(reelCode: string);
+instagramDownloader.highlight.downloadHighlightStoryById(highlightId: string);
+```
 
 ### Get profile information
 

@@ -60,53 +60,52 @@ declare class InstagramRequest {
     }[]>;
     getAllSubStoriesByHighlightId: (highlightId: string) => Promise<IStory[]>;
     getUserPosts: (username: string, startCursor: string, totalFetchedPosts: number, limit: number) => Promise<IPost[]>;
+    getPostDataByCode: (postCode: string) => Promise<IPost>;
     clearProfilePostById: (postId: string, csrfToken: string) => Promise<void>;
 }
 
 declare class HighlightDownloader {
     private instagramRequest;
-    private username;
-    constructor(instagramRequest: InstagramRequest, username: string);
+    constructor(instagramRequest: InstagramRequest);
     private getHighlightStoryStatistics;
     private downloadHighlightStoryMedia;
     private writeHighlightStoryStatisticToFile;
-    downloadAllUserHighlightStories: (writeStatisticFile?: boolean, downloadMedia?: boolean) => Promise<void>;
+    downloadAllUserHighlightStories: (username: string, writeStatisticFile?: boolean, downloadMedia?: boolean) => Promise<void>;
+    downloadHighlightStoryById: (highlightId: string) => Promise<void>;
 }
 
 declare class PostDownloader {
     private instagramRequest;
-    private username;
-    constructor(instagramRequest: InstagramRequest, username: string);
+    constructor(instagramRequest: InstagramRequest);
     private writePostStatisticToCsv;
     private downloadUserPostsMedia;
-    downloadAllUserPosts: (writeStatisticFile?: boolean, downloadMedia?: boolean, limit?: number) => Promise<void>;
+    downloadAllUserPosts: (username: string, writeStatisticFile?: boolean, downloadMedia?: boolean, limit?: number) => Promise<void>;
+    downloadPostByCode: (postCode: string) => Promise<void>;
 }
 
 declare class ReelsDownloader {
     private instagramRequest;
-    private username;
-    constructor(instagramRequest: InstagramRequest, username: string);
+    constructor(instagramRequest: InstagramRequest);
     private writeReelsStatisticToCsv;
     private downloadReelsMedia;
-    downloadAllUserReels: (writeStatisticFile?: boolean, downloadMedia?: boolean, limit?: number) => Promise<void>;
+    downloadAllUserReels: (username: string, writeStatisticFile?: boolean, downloadMedia?: boolean, limit?: number) => Promise<void>;
+    downloadReelByCode: (reelCode: string) => Promise<void>;
 }
 
 declare class StoryDownloader {
     private instagramRequest;
-    private username;
-    constructor(instagramRequest: InstagramRequest, username: string);
-    downloadAllUserStories: () => Promise<void>;
+    constructor(instagramRequest: InstagramRequest);
+    downloadAllUserStories: (username: string) => Promise<void>;
 }
 
 declare class InstagramDownloader {
     private instagramRequest;
-    private username;
     highlight: HighlightDownloader;
     post: PostDownloader;
     reel: ReelsDownloader;
     story: StoryDownloader;
-    constructor(cookies: string, username: string);
-    getProfileInfor: () => Promise<IProfile>;
+    constructor(cookies: string);
+    getProfileInfor: (username: string) => Promise<IProfile>;
 }
 
 declare class ProfileCleaner {

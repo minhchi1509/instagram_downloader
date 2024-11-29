@@ -1,6 +1,7 @@
 /node_modules
 /src
 /cache_cursor
+test
 
 .env
 .DS_Store

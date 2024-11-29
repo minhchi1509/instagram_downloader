@@ -340,6 +340,45 @@ class InstagramRequest {
     return userPosts;
   };
 
+  getPostDataByCode = async (postCode: string): Promise<IPost> => {
+    const { data } = await this.axiosInstance.get(
+      `https://www.instagram.com/p/${postCode}/?__a=1&__d=dis`
+    );
+    const postData = data.items[0];
+    const originalMediaList: any[] = Array.from(
+      postData.carousel_media || [postData]
+    );
+    const videos: IMedia[] = originalMediaList
+      .filter((media) => media.media_type === 2)
+      .map((media) => ({
+        downloadUrl: media.video_versions[0].url,
+        id: media.id,
+      }));
+
+    const images: IMedia[] = originalMediaList
+      .filter((media) => media.media_type === 1)
+      .map((media) => ({
+        downloadUrl: media.image_versions2.candidates[0].url,
+        id: media.id,
+      }));
+
+    return {
+      id: postData.id,
+      code: postData.code,
+      title: postData.caption?.text,
+      takenAt: dayjs.unix(postData.taken_at).format("DD/MM/YYYY HH:mm:ss"),
+      totalMedia: originalMediaList.length,
+      videoCount: videos.length,
+      imageCount: images.length,
+      likeCount: postData.like_and_view_counts_disabled
+        ? null
+        : postData.like_count,
+      commentCount: postData.comment_count,
+      videos,
+      images,
+    };
+  };
+
   clearProfilePostById = async (postId: string, csrfToken: string) => {
     await this.axiosInstance.post(
       `https://www.instagram.com/api/v1/web/create/${postId}/delete/?__s=p7ydkq:utmpms:ew6qri`,
